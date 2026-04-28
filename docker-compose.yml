@@ -1,0 +1,19 @@
+services:
+  api-service:
+    build: ./backend
+    container_name: backend-api
+    ports:
+      - "12000:12000/tcp"      # Socket TCP
+      - "12001:12001/udp"      # Socket UDP
+      - "8000:8000/tcp"       # FastAPI
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+    restart: always
+
+  dashboard:
+    build: ./frontend
+    container_name: frontend-react
+    ports:
+      - "3000:80"             # Panel visual
+    restart: always
