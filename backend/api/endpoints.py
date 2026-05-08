@@ -4,8 +4,20 @@ from fastapi.security import APIKeyHeader
 from core.database import get_db_connection
 from dotenv import load_dotenv
 
-# Cargar las variables de entorno
-load_dotenv()
+# Intenta leer directamente del sistema operativo primero
+SECRET_AUTH_TOKEN = os.getenv("SECRET_AUTH_TOKEN")
+
+# Si no lo encuentra, entonces intenta cargar el .env (útil para desarrollo local)
+if not SECRET_AUTH_TOKEN:
+    load_dotenv()
+    SECRET_AUTH_TOKEN = os.getenv("SECRET_AUTH_TOKEN")
+
+print("--- VERIFICACIÓN DE ENTORNO ---")
+print(f"Directorio de trabajo actual: {os.getcwd()}")
+print(f"¿Token configurado?: {'SÍ' if os.getenv('SECRET_AUTH_TOKEN') else 'NO'}")
+print(f"Variables detectadas: {list(os.environ.keys())}")
+print("-------------------------------")
+
 
 router = APIRouter()
 
@@ -66,3 +78,13 @@ def obtener_ventas_recientes(token: str = Security(validar_token)):
         return {"status": "ok", "data": resultados}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+@router.get("/debug-auth")
+def debug_auth():
+    import os
+    token_en_memoria = os.getenv("SECRET_AUTH_TOKEN")
+    return {
+        "token_cargado": token_en_memoria is not None,
+        # Mostramos solo los primeros 3 caracteres por seguridad
+        "prefijo": token_en_memoria[:3] if token_en_memoria else "NULO"
+    }

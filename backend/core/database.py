@@ -2,7 +2,10 @@ import os
 import pymysql
 from dotenv import load_dotenv
 
-load_dotenv()
+SECRET_AUTH_TOKEN = os.getenv("SECRET_AUTH_TOKEN")
+if not SECRET_AUTH_TOKEN:
+    load_dotenv()
+    SECRET_AUTH_TOKEN = os.getenv("SECRET_AUTH_TOKEN")
 
 def get_db_connection():
     return pymysql.connect(
