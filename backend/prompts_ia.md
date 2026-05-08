@@ -1,29 +1,49 @@
-# 🤖 Prompts de Ayuda para Copilotos de IA (ChatGPT, Claude, Gemini)
+### Maestro para Generación de Endpoints
 
-*Copia y pega el texto debajo de las líneas directamente en tu IA de preferencia. Estos prompts ya tienen el contexto de nuestra nueva arquitectura con MariaDB.*
-
----
-**Prompt 1: Inicializar Base de Datos MySQL/MariaDB (core/database.py)**
-
-> Actúa como un experto en Python. Estoy creando un proyecto en FastAPI con una base de datos MariaDB/MySQL. 
-> Escribe el código para el archivo `core/database.py`. Necesito que este archivo cargue las credenciales usando `python-dotenv` (variables: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME). 
-> Implementa una función generadora llamada `get_db_connection()` que utilice la librería `pymysql` para abrir una conexión a la base de datos usando un cursor de tipo `DictCursor` (para que los resultados regresen como diccionarios). Asegúrate de incluir el manejo básico de excepciones de conexión.
-
----
-**Prompt 2: Lógica de Sockets e Inserción SQL (sockets/handlers.py)**
-
-> Actúa como un experto en Python. En mi proyecto FastAPI tengo un archivo `sockets/handlers.py` con dos funciones que corren en hilos separados: `start_tcp_server` (puerto 12000) y `start_udp_server` (puerto 12001).
-> Escribe el código de este archivo. Debe importar `get_db_connection` desde `core.database`. 
-> Cuando los sockets reciban datos (texto CSV o JSON), deben decodificarlos e insertarlos usando SQL tradicional: `INSERT INTO registro_datos (origen, contenido) VALUES (%s, %s)`. 
-> La columna `origen` será el string "TCP" o "UDP", y la columna `contenido` debe guardar el dato. 
-> MUY IMPORTANTE: Usa la conexión a la base de datos de manera segura (`with get_db_connection() as conn:`) y añade bloques `try/except` robustos para que el hilo del socket nunca muera si falla la base de datos.
-
----
-**Prompt 3: Endpoints, SQL y Pydantic (api/endpoints.py y models/schemas.py)**
-
-> Actúa como un experto en FastAPI y MySQL. Necesito crear las rutas para consultar los datos de MariaDB.
-> Primero, descríbeme cómo hacer un modelo de Pydantic en `models/schemas.py` para la tabla `registro_datos` (id: int, origen: str, contenido: dict o str, fecha: datetime).
-> Luego, escribe el código para `api/endpoints.py`. Utiliza `APIRouter` para crear un endpoint `GET /api/v1/datos`. 
-> Este endpoint debe usar `get_db_connection` desde `core.database` para ejecutar `SELECT * FROM registro_datos ORDER BY fecha DESC LIMIT 100`. 
-> Transforma el resultado obtenido por pymysql en una lista de diccionarios, valídalos con el esquema de Pydantic, y devuélvelos.
-> Finalmente, muéstrame cómo registrar este router en mi archivo `main.py`.
+> **Contexto:**
+> Actúa como un experto en SQL y Python (FastAPI). Estoy trabajando en el backend de un Data Warehouse y mi rol es escribir los endpoints (rutas) de consulta (`SELECT`) que consumirá el frontend (React) para mostrar gráficas y KPIs.
+> Mi nivel técnico se enfoca principalmente en SQL puro y análisis de datos, por lo que necesito que generes el código Python necesario para exponer estas consultas mediante FastAPI usando la librería `pymysql`.
+> **Estructura del Archivo Destino (`api/endpoints.py`):**
+> Ya tengo un archivo base configurado que utiliza un router y una dependencia de seguridad (API Key). Todo código nuevo que generes debe encajar en esta estructura:
+> ```python
+> from fastapi import APIRouter, HTTPException, Security
+> from core.database import get_db_connection
+> # (Asume que 'validar_token' ya está importado o definido en el archivo)
+> router = APIRouter()
+> 
+> @router.get("/mi-nuevo-endpoint")
+> def nombre_de_funcion(token: str = Security(validar_token)):
+>     try:
+>         conn = get_db_connection()
+>         with conn.cursor() as cursor:
+>             # AQUÍ VA EL CÓDIGO SQL Y LA EJECUCIÓN
+>             sql = "SELECT ..."
+>             cursor.execute(sql)
+>             resultados = cursor.fetchall()
+>         conn.close()
+>         return {"status": "ok", "data": resultados}
+>     except Exception as e:
+>         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+> 
+> ```
+> 
+> 
+> **El Esquema de la Base de Datos:**
+> *(Pega aquí el código SQL con todos los `CREATE TABLE` del Data Warehouse)*
+> **Tu Tarea:**
+> 1. Analiza el esquema de la base de datos que te proporcioné.
+> 2. Genera el código completo para **3 nuevos endpoints** (incluyendo el decorador `@router.get(...)` y la función) siguiendo exactamente la estructura base.
+> 3. Los endpoints que necesito son:
+> * **Endpoint 1 (`/kpis-resumen`):** Debe devolver el total de ventas (dinero sumado), el total de pedidos (órdenes únicas) y el ticket promedio (total/pedidos).
+> * **Endpoint 2 (`/ventas-por-estado`):** Debe devolver el volumen de ventas agrupado por el estado (`state`) del cliente, ordenado de mayor a menor. Esto servirá para una gráfica de barras.
+> * **Endpoint 3 (`/top-categorias`):** Debe devolver las 5 categorías de productos más vendidas (en cantidad de items) junto con su nombre en inglés (`product_category_name_english`), cruzando con la tabla de traducciones.
+> 
+> 
+> 
+> 
+> **Restricciones:**
+> * Usa SQL puro, no uses ORMs.
+> * Asegúrate de manejar posibles nulos en tus consultas (ej. `COALESCE`).
+> * El resultado devuelto en el JSON debe ser fácil de iterar para un frontend de React.
+> 
+> 
