@@ -1,5 +1,6 @@
 backend/*.md
-agentes/datasets/
+frontend/*.md
+/agentes/datasets/
 .env
 venv/
 .venv/
