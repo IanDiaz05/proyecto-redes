@@ -42,7 +42,7 @@ def obtener_kpis_principales(token: str = Security(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-@router.get("/ventas-recientes")
+@router.get("/ultimas_ventas")
 def obtener_ventas_recientes(token: str = Security(validar_token)):
     try:
         conn = get_db_connection()
