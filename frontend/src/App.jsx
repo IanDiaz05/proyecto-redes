@@ -5,6 +5,7 @@ import DashboardLayout from "./layouts/DashboardLayout"
 import ResumenGeneral from "./pages/ResumenGeneral"
 import VentasEcommerce from "./pages/VentasEcommerce"
 import TelemetriaIot from "./pages/TelemetriaIot"
+import ApiDocs from "./pages/ApiDocs"
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
           <Route path="/" element={<ResumenGeneral />} />
           <Route path="/ecommerce" element={<VentasEcommerce />} />
           <Route path="/iot" element={<TelemetriaIot />} />
+          <Route path="/docs" element={<ApiDocs />} />
         </Routes>
       </DashboardLayout>
     </Router>
