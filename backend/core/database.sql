@@ -102,3 +102,13 @@ CREATE TABLE fact_reviews (
     review_score INT,
     FOREIGN KEY (order_id) REFERENCES dim_orders(order_id)
 ) ENGINE=InnoDB;
+
+-- =======================================================
+-- TABLA INDEPENDIENTE PARA TELEMETRÍA DEL AGENTE UDP
+CREATE TABLE telemetry_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sensor_id VARCHAR(10),
+    temperature DECIMAL(5,2),
+    humidity DECIMAL(5,2)
+) ENGINE=InnoDB;
