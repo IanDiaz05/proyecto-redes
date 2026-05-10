@@ -21,21 +21,33 @@ def procesar_e_insertar(origen_red, datos_crudos):
         with conn.cursor() as cursor:
             # --- DIMENSIONES ---
             
-            # Geolocalización
+            # Geolocalización del cliente
             cursor.execute("INSERT IGNORE INTO dim_geolocation (zip_code_prefix, city, state) VALUES (%s, %s, %s)", 
-                           (d['zip_code'], d['city'], d['state']))
+                           (d['customer_zip_code'], d['customer_city'], d['customer_state']))
+            
+            # Geolocalización del vendedor
+            cursor.execute("INSERT IGNORE INTO dim_geolocation (zip_code_prefix, city, state) VALUES (%s, %s, %s)", 
+                           (d['seller_zip_code'], d['seller_city'], d['seller_state']))
             
             # Cliente
             cursor.execute("INSERT IGNORE INTO dim_customers (customer_id, zip_code_prefix, city, state) VALUES (%s, %s, %s, %s)", 
-                           (d['customer_id'], d['zip_code'], d['city'], d['state']))
+                           (d['customer_id'], d['customer_zip_code'], d['customer_city'], d['customer_state']))
             
             # Vendedor
             cursor.execute("INSERT IGNORE INTO dim_sellers (seller_id, zip_code_prefix, city, state) VALUES (%s, %s, %s, %s)", 
-                           (d['seller_id'], d['zip_code'], d['city'], d['state']))
+                           (d['seller_id'], d['seller_zip_code'], d['seller_city'], d['seller_state']))
             
             # Fecha
             cursor.execute("INSERT IGNORE INTO dim_date (date_id, year, month, day, quarter, day_name) VALUES (%s, %s, %s, %s, %s, %s)", 
                            (d['purchase_date_id'], d['year'], d['month'], d['day'], d['quarter'], d['day_name']))
+            
+            # Traducción de categoría
+            cursor.execute("INSERT IGNORE INTO dim_category_translation (product_category_name, product_category_name_english) VALUES (%s, %s)", 
+                           (d['category'], d['category'])) # Si no hay traducción en inglés, repetimos la original temporalmente
+            
+            # Producto
+            cursor.execute("INSERT IGNORE INTO dim_products (product_id, product_category_name) VALUES (%s, %s)", 
+                           (d['product_id'], d['category']))
             
             # --- CABECERA DE LA ORDEN (dim_orders) ---
             cursor.execute("INSERT IGNORE INTO dim_orders (order_id, customer_id, purchase_date_id) VALUES (%s, %s, %s)", 
@@ -70,7 +82,6 @@ def procesar_e_insertar(origen_red, datos_crudos):
 # ==========================================
 def start_tcp_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # Permite reutilizar el puerto rápido si reinicias el script
     server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1) 
     server.bind(('0.0.0.0', 12000))
     server.listen(5)
@@ -80,21 +91,24 @@ def start_tcp_server():
         client, addr = server.accept()
         print(f"📞 Nueva conexión TCP desde {addr}")
         
-        # Bucle interno para mantener la conexión viva mientras el agente envía CSVs
+        buffer = "" # Memoria temporal para juntar pedazos de mensajes
+        
         while True:
             try:
-                # Usamos 4096 bytes para asegurar que todo el JSON quepa en una lectura
                 data = client.recv(4096).decode('utf-8')
                 
                 if not data:
                     print(f"🛑 El cliente {addr} cerró la conexión TCP.")
                     break 
                 
-                # Convertimos el string a diccionario de Python
-                datos_json = json.loads(data)
+                buffer += data # Añadimos lo recibido al buffer
                 
-                # Enviamos al procesador ETL
-                procesar_e_insertar("TCP", datos_json)
+                # Procesamos todos los JSON completos que haya en el buffer
+                while '\n' in buffer:
+                    linea, buffer = buffer.split('\n', 1)
+                    if linea.strip(): # Si la línea no está vacía
+                        datos_json = json.loads(linea)
+                        procesar_e_insertar("TCP", datos_json)
                 
             except json.JSONDecodeError:
                 print("⚠️ Error TCP: Se recibió un dato que no es JSON válido.")
