@@ -647,44 +647,8 @@ def comparativa_anual(token: str = Security(validar_token)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
-
 # ==========================================
-# 20. PEDIDOS POR RANGO DE FECHAS
-# ==========================================
-@router.get("/pedidos-por-rango")
-def pedidos_por_rango(
-    fecha_inicio: str = Query(..., description="Fecha inicio YYYY-MM-DD"),
-    fecha_fin:    str = Query(..., description="Fecha fin   YYYY-MM-DD"),
-    token: str = Security(validar_token)
-):
-    """Pedidos e ingresos dentro de un rango de fechas específico."""
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT
-                    o.order_id,
-                    o.purchase_date_id                AS fecha,
-                    c.state                           AS estado_cliente,
-                    COALESCE(SUM(s.total_value), 0)   AS total_pedido,
-                    COALESCE(SUM(s.freight_value), 0) AS total_flete,
-                    COUNT(s.order_item_id)            AS items
-                FROM dim_orders o
-                JOIN dim_customers c ON o.customer_id = c.customer_id
-                JOIN fact_sales s    ON o.order_id    = s.order_id
-                WHERE o.purchase_date_id BETWEEN %s AND %s
-                GROUP BY o.order_id, o.purchase_date_id, c.state
-                ORDER BY o.purchase_date_id DESC
-            """
-            cursor.execute(sql, (fecha_inicio, fecha_fin))
-            resultados = cursor.fetchall()
-        conn.close()
-        return {"status": "ok", "data": resultados}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-
-# ==========================================
-# 21. TELEMETRÍA EN VIVO (últimos 20 registros)
+# 20. TELEMETRÍA EN VIVO (últimos 20 registros)
 # ==========================================
 @router.get("/telemetria-vivo")
 def obtener_telemetria_vivo(token: str = Security(validar_token)):
