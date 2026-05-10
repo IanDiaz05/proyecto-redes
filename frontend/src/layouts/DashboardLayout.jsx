@@ -1,5 +1,6 @@
 import { Activity, Database, LayoutDashboard, Server, Settings, Menu, X } from "lucide-react";
 import { useState } from "react";
+import { NavLink } from "react-router-dom";
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -21,7 +22,6 @@ export default function DashboardLayout({ children }) {
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        {/* Encabezado del Sidebar */}
         <div className="h-16 flex items-center justify-between px-6 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-2">
             <Database className="w-5 h-5 text-blue-500" />
@@ -35,21 +35,20 @@ export default function DashboardLayout({ children }) {
           </button>
         </div>
         
-        {/* Menú de Navegación */}
+        {/* Menú de Navegación con Rutas */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          <NavItem icon={<LayoutDashboard />} label="Resumen General" active />
-          <NavItem icon={<Activity />} label="Ventas E-commerce (TCP)" />
-          <NavItem icon={<Server />} label="Telemetría IoT (UDP)" />
+          <NavItem to="/" icon={<LayoutDashboard />} label="Resumen General" />
+          <NavItem to="/ecommerce" icon={<Activity />} label="Ventas E-commerce" />
+          <NavItem to="/iot" icon={<Server />} label="Telemetría IoT" />
           
           <div className="pt-4 mt-4 border-t border-zinc-200 dark:border-zinc-800">
-            <NavItem icon={<Settings />} label="Configuración" />
+            <NavItem to="/configuracion" icon={<Settings />} label="Configuración" />
           </div>
         </nav>
       </aside>
 
       {/* Contenedor Principal */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        
         {/* Topbar */}
         <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm z-10">
           <div className="flex items-center gap-4">
@@ -87,21 +86,23 @@ export default function DashboardLayout({ children }) {
   );
 }
 
-// Subcomponente para los enlaces de navegación
-function NavItem({ icon, label, active }) {
+// Subcomponente de navegación usando NavLink
+function NavItem({ to, icon, label }) {
   return (
-    <a 
-      href="#" 
-      className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-        active 
-          ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50' 
-          : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
-      }`}
+    <NavLink 
+      to={to} 
+      className={({ isActive }) => 
+        `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+          isActive 
+            ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50' 
+            : 'text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
+        }`
+      }
     >
       <span className="w-4 h-4 flex items-center justify-center">
         {icon}
       </span>
       {label}
-    </a>
+    </NavLink>
   );
 }
