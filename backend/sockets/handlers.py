@@ -119,7 +119,25 @@ def start_tcp_server():
         client.close()
 
 # ==========================================
-# 3. SERVIDOR UDP (AGENTE DE TELEMETRÍA)
+# 3. LOGICA DE PROCESAMIENTO DE TELEMETRÍA (AGENTE DE TELEMETRÍA UDP)
+# ==========================================
+def procesar_telemetria(datos):
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO telemetry_logs (sensor_id, temperature, humidity) VALUES (%s, %s, %s)",
+                (datos.get('sensor_id'), datos.get('temperature'), datos.get('humidity'))
+            )
+        conn.commit()
+    except Exception as e:
+        print(f"❌ Error insertando telemetría: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+# ==========================================
+# 4. SERVIDOR UDP (AGENTE DE TELEMETRÍA)
 # ==========================================
 def start_udp_server():
     server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -131,9 +149,10 @@ def start_udp_server():
             data, addr = server.recvfrom(4096)
             datos_json = json.loads(data.decode('utf-8'))
             
-            procesar_e_insertar("UDP", datos_json)
+            # Redirigimos a la tabla de telemetría
+            procesar_telemetria(datos_json)
             
         except json.JSONDecodeError:
-            print("⚠️ Error UDP: Se recibió un dato que no es JSON válido.")
+            pass # Ignoramos paquetes mal formados (común en UDP)
         except Exception as e:
             print(f"❌ Error en el servidor UDP: {e}")

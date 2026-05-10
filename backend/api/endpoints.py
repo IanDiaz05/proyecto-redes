@@ -682,3 +682,29 @@ def pedidos_por_rango(
         return {"status": "ok", "data": resultados}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+# ==========================================
+# 21. TELEMETRÍA EN VIVO (últimos 20 registros)
+# ==========================================
+@router.get("/telemetria-vivo")
+def obtener_telemetria_vivo(token: str = Security(validar_token)):
+    """
+    Devuelve los últimos 20 registros de sensores para una gráfica en tiempo real.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT sensor_id, temperature, humidity, DATE_FORMAT(timestamp, '%H:%i:%s') as time 
+                FROM telemetry_logs 
+                ORDER BY id DESC 
+                LIMIT 20
+            """)
+            resultados = cursor.fetchall()
+        conn.close()
+        
+        # Invertimos la lista para que el gráfico vaya de izquierda (antiguo) a derecha (nuevo)
+        return {"status": "ok", "data": resultados[::-1]}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
