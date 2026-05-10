@@ -5,6 +5,14 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm install
 
+# Declarar los argumentos de construcción (ARG)
+ARG VITE_API_BASE_URL
+ARG VITE_API_KEY
+
+# Pasarlos a variables de entorno (ENV) para que Vite los lea al compilar
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+ENV VITE_API_KEY=$VITE_API_KEY
+
 # Copiar el resto y construir
 COPY . .
 RUN npm run build

@@ -18,7 +18,11 @@ services:
     restart: always
 
   dashboard:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+        - VITE_API_KEY=${SECRET_AUTH_TOKEN}
     networks:
       - dokploy-network
     restart: always
