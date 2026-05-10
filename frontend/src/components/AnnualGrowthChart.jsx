@@ -6,6 +6,8 @@ import {
   BarElement,
   PointElement,
   LineElement,
+  BarController,
+  LineController,
   Title,
   Tooltip,
   Legend,
@@ -14,7 +16,7 @@ import { Chart } from "react-chartjs-2"; // Usamos Chart genérico para gráfica
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { fetchApi } from "@/services/apicalls";
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, Title, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, BarElement, PointElement, LineElement, BarController, LineController, Title, Tooltip, Legend);
 
 export default function AnnualGrowthChart() {
   const [chartData, setChartData] = useState(null);
