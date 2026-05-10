@@ -34,11 +34,19 @@ def limpiar_datos(payload: dict) -> dict:
         datos_limpios['quarter'] = (hoy.month - 1) // 3 + 1
         datos_limpios['day_name'] = hoy.strftime('%A')
 
-    # 3. Limpieza de Geometría y Strings (Convertir nulos a "Sin Especificar")
-    datos_limpios['zip_code'] = int(payload.get('zip_code', 0)) or 0
-    datos_limpios['city'] = str(payload.get('city', 'Sin Especificar')).upper()
-    datos_limpios['state'] = str(payload.get('state', 'NA')).upper()[:2]
-    datos_limpios['category'] = str(payload.get('category', 'Sin Categoria')).lower()
+    # 3. Limpieza de Geometría y Strings (Diferenciando Cliente y Vendedor)
+    # Cliente
+    datos_limpios['customer_zip_code'] = int(payload.get('customer_zip_code') or 0)
+    datos_limpios['customer_city'] = str(payload.get('customer_city', 'Sin Especificar')).upper()
+    datos_limpios['customer_state'] = str(payload.get('customer_state', 'NA')).upper()[:2]
+    
+    # Vendedor
+    datos_limpios['seller_zip_code'] = int(payload.get('seller_zip_code') or 0)
+    datos_limpios['seller_city'] = str(payload.get('seller_city', 'Sin Especificar')).upper()
+    datos_limpios['seller_state'] = str(payload.get('seller_state', 'NA')).upper()[:2]
+    
+    # Categoría
+    datos_limpios['category'] = str(payload.get('category', 'sin_categoria')).lower()
     
     # 4. Formateo de Números (Asegurar que no vengan nulos o textos raros)
     try:
