@@ -112,3 +112,11 @@ CREATE TABLE telemetry_logs (
     temperature DECIMAL(5,2),
     humidity DECIMAL(5,2)
 ) ENGINE=InnoDB;
+
+-- NUEVA TABLA CENTRAL PARA LOGS EN BRUTO DE DE TCP Y UDP
+CREATE TABLE central_logs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    origen ENUM('TCP', 'UDP') NOT NULL,
+    contenido TEXT NOT NULL, -- Guardaremos el JSON completo aquí
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
