@@ -27,7 +27,7 @@ app.add_middleware(
 # ==========================================
 # RUTAS DE LA API
 # ==========================================
-app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router, prefix="/api/datos")
 
 @app.get("/")
 def root():
