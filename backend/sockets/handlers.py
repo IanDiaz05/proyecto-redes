@@ -19,6 +19,14 @@ def procesar_e_insertar(origen_red, datos_crudos):
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+
+            # --- LOG CENTRAL ---
+            # Guardamos el JSON tal cual llegó antes de los inserts específicos
+            cursor.execute(
+                "INSERT INTO central_logs (origen, contenido) VALUES (%s, %s)",
+                (origen_red, json.dumps(datos_crudos))
+            )
+
             # --- DIMENSIONES ---
             
             # Geolocalización del cliente
@@ -121,15 +129,23 @@ def start_tcp_server():
 # ==========================================
 # 3. LOGICA DE PROCESAMIENTO DE TELEMETRÍA (AGENTE DE TELEMETRÍA UDP)
 # ==========================================
-def procesar_telemetria(datos):
+def procesar_telemetria(origen_red, datos):
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
+            # --- 1. LOG CENTRAL ---
+            cursor.execute(
+                "INSERT INTO central_logs (origen, contenido) VALUES (%s, %s)",
+                (origen_red, json.dumps(datos))
+            )
+
+            # --- 2. TABLA DE TELEMETRÍA ---
             cursor.execute(
                 "INSERT INTO telemetry_logs (sensor_id, temperature, humidity) VALUES (%s, %s, %s)",
                 (datos.get('sensor_id'), datos.get('temperature'), datos.get('humidity'))
             )
         conn.commit()
+        print(f"📡 [{origen_red}] Telemetría registrada en Log Central y Tabla de Sensores.")
     except Exception as e:
         print(f"❌ Error insertando telemetría: {e}")
     finally:
@@ -150,7 +166,7 @@ def start_udp_server():
             datos_json = json.loads(data.decode('utf-8'))
             
             # Redirigimos a la tabla de telemetría
-            procesar_telemetria(datos_json)
+            procesar_telemetria("UDP", datos_json)
             
         except json.JSONDecodeError:
             pass # Ignoramos paquetes mal formados (común en UDP)

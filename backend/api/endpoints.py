@@ -708,3 +708,32 @@ def obtener_telemetria_vivo(token: str = Security(validar_token)):
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+
+# ==========================================
+# 22. BALANCE DE PROTOCOLOS TCP VS UDP
+# ==========================================
+@router.get("/balance-protocolos")
+def obtener_balance_protocolos(token: str = Security(validar_token)):
+    """
+    Devuelve el conteo total de registros procesados por TCP vs UDP
+    ideal para una gráfica de pastel en el dashboard.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            # Consultamos la tabla de auditoría central
+            sql = """
+                SELECT origen, COUNT(*) as total 
+                FROM central_logs 
+                GROUP BY origen
+            """
+            cursor.execute(sql)
+            resultados = cursor.fetchall()
+        conn.close()
+        
+        return {
+            "status": "ok", 
+            "data": resultados
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en auditoría: {str(e)}")
