@@ -1,6 +1,7 @@
 import { Activity, Database, LayoutDashboard, Server, BookOpen, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
+import OrderSearch from "@/components/OrderSearch";
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -80,7 +81,7 @@ export default function DashboardLayout({ children }) {
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Topbar */}
         <header className="h-16 flex items-center justify-between px-4 md:px-8 border-b border-zinc-200 dark:border-zinc-800 bg-white/50 dark:bg-zinc-950/50 backdrop-blur-sm z-10">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1"> {/* Añadimos flex-1 aquí */}
             <button 
               className="md:hidden p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-50 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setIsSidebarOpen(true)}
@@ -91,9 +92,13 @@ export default function DashboardLayout({ children }) {
               <h2 className="text-sm font-semibold tracking-tight">Panel de Control</h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">FastAPI • React • Chart.js</p>
             </div>
+            
+            {/* AQUÍ INSERTAMOS EL COMPONENTE DE BÚSQUEDA */}
+            <OrderSearch />
+            
           </div>
 
-          <div className="ml-auto flex items-center space-x-3 bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800">
+          <div className="ml-auto flex shrink-0 items-center space-x-3 bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
