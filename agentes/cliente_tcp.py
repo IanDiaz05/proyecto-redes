@@ -1,6 +1,8 @@
 import socket
 import json
 import time
+import random
+from datetime import datetime
 import pandas as pd
 import numpy as np
 
@@ -57,8 +59,7 @@ def iniciar_transmision_tcp():
     if df_ventas is None:
         return
 
-    total_registros = len(df_ventas)
-    print(f"✅ ¡Fusión exitosa! Se han preparado {total_registros} items para enviar.")
+    print("✅ ¡Base de datos cargada en RAM! Iniciando Modo Demo E-commerce.")
     print(f"🔌 Conectando al servidor Data Warehouse en {HOST}:{PORT}...")
     
     cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -67,21 +68,38 @@ def iniciar_transmision_tcp():
         cliente.connect((HOST, PORT))
         print("🟢 Conexión TCP establecida con éxito.\n")
         
-        # Convertir el DataFrame a una lista de diccionarios
-        registros = df_ventas.to_dict(orient='records')
-        
-        for i, fila in enumerate(registros):
-            mensaje = json.dumps(fila) + "\n"
+        contador = 1
+        while True:
+            # Seleccionar una fila completamente al azar del dataset
+            fila_aleatoria = df_ventas.sample(n=1).to_dict(orient='records')[0]
+            
+            # Alterar el ID y la Fecha para que sea "En Vivo"
+            # Generamos un ID único usando el timestamp actual
+            nuevo_order_id = f"DEMO-{int(time.time() * 1000)}"
+            fila_aleatoria['order_id'] = nuevo_order_id
+            
+            # Asignamos la fecha y hora exacta de este segundo
+            fecha_actual = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            fila_aleatoria['purchase_date'] = fecha_actual
+            
+            # Enviar el paquete
+            mensaje = json.dumps(fila_aleatoria) + "\n"
             cliente.sendall(mensaje.encode('utf-8'))
-            print(f"[TCP] ({i+1}/{total_registros}) Venta enviada -> Orden: {fila['order_id'][:8]}... | Precio: ${fila['price']}")
-
-            time.sleep(0.01)
+            
+            print(f"[TCP] Venta Simulada #{contador} -> Orden: {nuevo_order_id} | Precio: ${fila_aleatoria['price']} | Hora: {fecha_actual}")
+            
+            contador += 1
+            
+            # Pausa aleatoria entre 1 y 4 segundos para simular compras orgánicas
+            time.sleep(random.uniform(1.0, 4.0))
             
     except ConnectionRefusedError:
         print("❌ Error: Conexión rechazada. Asegúrate de que el backend de FastAPI esté corriendo.")
+    except KeyboardInterrupt:
+        print("\n🛑 Simulación pausada manualmente.")
     finally:
         cliente.close()
-        print("\n🛑 Transmisión finalizada y socket cerrado.")
+        print("Socket cerrado.")
 
 if __name__ == "__main__":
     iniciar_transmision_tcp()

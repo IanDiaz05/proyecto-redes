@@ -9,6 +9,11 @@ import VentasPorTrimestreChart from "@/components/VentasPorTrimestreChart";
 import MetodosPagoChart from "@/components/MetodosPagoChart";
 import TopClientesTable from "@/components/TopClientesTable";
 import PedidosSinResenaCard from "@/components/PedidosSinResenaCard";
+<<<<<<< HEAD
+=======
+import MapaSellers from "@/components/MapaSellers";
+import RutasLogisticasMap from "@/components/RutasLogisticasMap";
+>>>>>>> dev
 
 export default function VentasEcommerce() {
   return (
@@ -46,11 +51,17 @@ export default function VentasEcommerce() {
 
         {/* Pestaña 2: Logística */}
         <TabsContent value="logistica" className="space-y-4">
+          {/* Fila 1: Gráficas de Logística */}
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
             <VentasPorEstadoChart />
             <RelacionPrecioFleteChart />
           </div>
-          {/* Aquí irá el mapa del mundo real más adelante */}
+          
+          {/* Fila 2: Mapas Geográficos de Logística */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-6">
+            <MapaSellers />
+            <RutasLogisticasMap />
+          </div>
         </TabsContent>
 
         {/* Pestaña 3: Comportamiento */}

@@ -3,6 +3,7 @@ import GlobalSatisfactionCard from "@/components/GlobalSatisfactionCard"
 import ProtocolBalanceChart from "@/components/ProtocolBalanceChart"
 import AnnualGrowthChart from "@/components/AnnualGrowthChart"
 import MonthlyTicketChart from "@/components/MonthlyTicketChart"
+import MapaClientes from "@/components/MapaClientes"
 
 export default function ResumenGeneral() {
   return (
@@ -22,15 +23,20 @@ export default function ResumenGeneral() {
         </div>
       </div>
       
-      {/* Fila 2: Gráficas de Tendencia y Protocolos */}
+      {/* Fila 2: Mapa de calor y Protocolos */}
       <div className="grid gap-4 md:grid-cols-3">
-        <AnnualGrowthChart />
         <ProtocolBalanceChart />
+        <div className="md:col-span-2">
+          <MapaClientes />
+        </div>
       </div>
 
-      {/* Fila 3: Gráfica de línea de tiempo */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <MonthlyTicketChart />
+      {/* Fila 3: Gráficas de Tendencia y Línea de Tiempo */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <AnnualGrowthChart />
+        <div className="md:col-span-1 flex flex-col">
+          <MonthlyTicketChart />
+        </div>
       </div>
     </div>
   )

@@ -461,30 +461,28 @@ def mapa_clientes(token: str = Security(validar_token)):
 
 
 # ==========================================
-# 14. MÉTODOS DE PAGO POR ESTADO
+# 14. DISTRIBUCIÓN DE MÉTODOS DE PAGO
 # ==========================================
-@router.get("/pagos-por-estado")
-def pagos_por_estado(token: str = Security(validar_token)):
-    """Método de pago más usado en cada estado. Para gráfica de barras apiladas."""
+@router.get("/distribucion-pagos")
+def distribucion_pagos(token: str = Security(validar_token)):
+    """Distribución global de métodos de pago para gráfica de pastel."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             sql = """
-                SELECT
-                    c.state              AS estado,
-                    p.payment_type       AS metodo_pago,
-                    COUNT(*)             AS total_transacciones,
-                    SUM(p.payment_value) AS monto_total
-                FROM fact_payments p
-                JOIN dim_orders o    ON p.order_id    = o.order_id
-                JOIN dim_customers c ON o.customer_id = c.customer_id
-                GROUP BY c.state, p.payment_type
-                ORDER BY c.state, total_transacciones DESC
+                SELECT 
+                    payment_type AS metodo,
+                    COUNT(*) AS total_transacciones,
+                    COALESCE(SUM(payment_value), 0) AS monto_total,
+                    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS porcentaje
+                FROM fact_payments
+                GROUP BY payment_type
+                ORDER BY total_transacciones DESC
             """
             cursor.execute(sql)
-            resultados = cursor.fetchall()
+            resultado = cursor.fetchall()
         conn.close()
-        return {"status": "ok", "data": resultados}
+        return {"status": "ok", "data": resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
@@ -674,7 +672,7 @@ def obtener_telemetria_vivo(token: str = Security(validar_token)):
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
 # ==========================================
-# 22. BALANCE DE PROTOCOLOS TCP VS UDP
+# 21. BALANCE DE PROTOCOLOS TCP VS UDP
 # ==========================================
 @router.get("/balance-protocolos")
 def obtener_balance_protocolos(token: str = Security(validar_token)):
@@ -701,3 +699,403 @@ def obtener_balance_protocolos(token: str = Security(validar_token)):
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en auditoría: {str(e)}")
+    
+# ==========================================
+# 2. VENTAS RECIENTES (Feed en vivo)
+# ==========================================
+@router.get("/ventas-recientes")
+def ventas_recientes(
+    token: str = Security(validar_token),
+    limite: int = Query(10, ge=1, le=50)
+):
+    """Últimas ventas procesadas con detalle de producto, vendedor y ubicación."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT 
+                    fs.order_id,
+                    fs.total_value,
+                    fs.price,
+                    fs.freight_value,
+                    p.product_category_name AS categoria,
+                    ct.product_category_name_english AS categoria_en,
+                    s.seller_id,
+                    s.city AS ciudad_vendedor,
+                    s.state AS estado_vendedor,
+                    c.customer_id,
+                    c.city AS ciudad_cliente,
+                    c.state AS estado_cliente,
+                    d.purchase_date_id AS fecha_compra
+                FROM fact_sales fs
+                JOIN dim_products p ON fs.product_id = p.product_id
+                LEFT JOIN dim_category_translation ct ON p.product_category_name = ct.product_category_name
+                JOIN dim_sellers s ON fs.seller_id = s.seller_id
+                JOIN dim_orders d ON fs.order_id = d.order_id
+                JOIN dim_customers c ON d.customer_id = c.customer_id
+                ORDER BY d.purchase_date_id DESC, fs.order_id DESC
+                LIMIT %s
+            """
+            cursor.execute(sql, (limite,))
+            resultado = cursor.fetchall()
+        conn.close()
+        return {"status": "ok", "data": resultado}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+# ==========================================
+# 3. COMPARATIVA HOY VS AYER
+# ==========================================
+@router.get("/comparativa-diaria")
+def comparativa_diaria(token: str = Security(validar_token)):
+    """Comparativa de ventas de hoy vs el día anterior."""
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT 
+                    DATE(purchase_date_id) AS fecha,
+                    COUNT(DISTINCT fs.order_id) AS total_pedidos,
+                    COALESCE(SUM(fs.total_value), 0) AS ingresos_totales,
+                    COALESCE(ROUND(AVG(fs.total_value), 2), 0) AS ticket_promedio,
+                    COUNT(DISTINCT fs.order_id) AS transacciones
+                FROM dim_orders o
+                JOIN fact_sales fs ON o.order_id = fs.order_id
+                WHERE purchase_date_id >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
+                GROUP BY DATE(purchase_date_id)
+                ORDER BY fecha DESC
+                LIMIT 2
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall()
+            
+            # Normalizar respuesta
+            hoy = rows[0] if len(rows) > 0 else None
+            ayer = rows[1] if len(rows) > 1 else None
+            
+        conn.close()
+        return {
+            "status": "ok",
+            "data": {
+                "hoy": hoy,
+                "ayer": ayer,
+                "diferencia_pedidos": round(((hoy['total_pedidos'] - ayer['total_pedidos']) / ayer['total_pedidos'] * 100), 2) if hoy and ayer and ayer['total_pedidos'] else 0,
+                "diferencia_ingresos": round(((hoy['ingresos_totales'] - ayer['ingresos_totales']) / ayer['ingresos_totales'] * 100), 2) if hoy and ayer and ayer['ingresos_totales'] else 0
+            }
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+# ==========================================
+# ENDPOINT: RUTAS LOGÍSTICAS (ArcLayer Deck.gl)
+# ==========================================
+@router.get("/rutas-logisticas")
+def rutas_logisticas(
+    token: str = Security(validar_token),
+    min_paquetes: int = Query(5, ge=1, le=1000, description="Umbral mínimo de paquetes para mostrar ruta"),
+    limite: int = Query(500, ge=10, le=2000, description="Máximo de rutas a devolver")
+):
+    """
+    Devuelve arcos origen→destino con metadatos para Deck.gl ArcLayer.
+    Origen: vendedor. Destino: cliente. Volumen = cantidad de pedidos.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT 
+                    -- Origen (Vendedor)
+                    g_v.longitude AS lon_origen,
+                    g_v.latitude AS lat_origen,
+                    g_v.city AS ciudad_origen,
+                    g_v.state AS estado_origen,
+                    
+                    -- Destino (Cliente)
+                    g_c.longitude AS lon_destino,
+                    g_c.latitude AS lat_destino,
+                    g_c.city AS ciudad_destino,
+                    g_c.state AS estado_destino,
+                    
+                    -- Métricas de la ruta
+                    COUNT(DISTINCT fs.order_id) AS cantidad_paquetes,
+                    COALESCE(SUM(fs.total_value), 0) AS ingresos_totales,
+                    COALESCE(SUM(fs.freight_value), 0) AS flete_total,
+                    COALESCE(ROUND(AVG(fs.freight_value), 2), 0) AS flete_promedio,
+                    COALESCE(ROUND(AVG(fs.total_value), 2), 0) AS ticket_promedio_ruta
+                    
+                FROM fact_sales fs
+                JOIN dim_orders o ON fs.order_id = o.order_id
+                JOIN dim_customers c ON o.customer_id = c.customer_id
+                JOIN dim_sellers s ON fs.seller_id = s.seller_id
+                
+                -- JOIN con geolocalización maestra (ahora con coordenadas reales)
+                JOIN dim_geolocation g_v ON s.zip_code_prefix = g_v.zip_code_prefix
+                JOIN dim_geolocation g_c ON c.zip_code_prefix = g_c.zip_code_prefix
+                
+                -- Solo rutas donde AMBOS tengan coordenadas válidas
+                WHERE g_v.latitude IS NOT NULL 
+                  AND g_v.longitude IS NOT NULL
+                  AND g_c.latitude IS NOT NULL 
+                  AND g_c.longitude IS NOT NULL
+                
+                GROUP BY 
+                    g_v.longitude, g_v.latitude, g_v.city, g_v.state,
+                    g_c.longitude, g_c.latitude, g_c.city, g_c.state
+                
+                HAVING COUNT(DISTINCT fs.order_id) >= %s
+                
+                ORDER BY cantidad_paquetes DESC, ingresos_totales DESC
+                LIMIT %s
+            """
+            cursor.execute(sql, (min_paquetes, limite))
+            rows = cursor.fetchall()
+            
+            # Formatear al JSON exacto que Deck.gl ArcLayer espera
+            data = []
+            for row in rows:
+                data.append({
+                    "origen": [float(row['lon_origen']), float(row['lat_origen'])],
+                    "destino": [float(row['lon_destino']), float(row['lat_destino'])],
+                    "ciudad_origen": row['ciudad_origen'],
+                    "estado_origen": row['estado_origen'],
+                    "ciudad_destino": row['ciudad_destino'],
+                    "estado_destino": row['estado_destino'],
+                    "cantidad_paquetes": row['cantidad_paquetes'],
+                    "ingresos_totales": float(row['ingresos_totales']),
+                    "flete_total": float(row['flete_total']),
+                    "flete_promedio": float(row['flete_promedio']),
+                    "ticket_promedio_ruta": float(row['ticket_promedio_ruta'])
+                })
+                
+        conn.close()
+        return {"status": "ok", "total_rutas": len(data), "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+# ==========================================
+# ENDPOINT: RETRASOS GEOESPACIALES
+# ==========================================
+@router.get("/retrasos-geo")
+def retrasos_geo(
+    token: str = Security(validar_token),
+    dias_minimos: int = Query(7, ge=1, le=60, description="Días mínimos de retraso para filtrar"),
+    limite: int = Query(1000, ge=10, le=5000)
+):
+    """
+    Pedidos con entrega tardía, geolocalizados en el cliente.
+    Incluye score de reseña para correlacionar demora con insatisfacción.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            sql = """
+                SELECT 
+                    g.latitude AS latitud,
+                    g.longitude AS longitud,
+                    g.city AS ciudad,
+                    g.state AS estado_cliente,
+                    
+                    -- Cálculo de días de retraso
+                    DATEDIFF(o.order_delivered_customer_date, o.order_estimated_delivery_date) AS dias_retraso,
+                    
+                    -- Métricas del pedido afectado
+                    fs.total_value AS valor_pedido,
+                    fs.freight_value AS valor_flete,
+                    p.product_category_name AS categoria_producto,
+                    ct.product_category_name_english AS categoria_en,
+                    
+                    -- Correlación con satisfacción
+                    fr.review_score AS score_resena,
+                    o.order_id
+                    
+                FROM dim_orders o
+                JOIN fact_sales fs ON o.order_id = fs.order_id
+                JOIN dim_customers c ON o.customer_id = c.customer_id
+                JOIN dim_geolocation g ON c.zip_code_prefix = g.zip_code_prefix
+                JOIN dim_products p ON fs.product_id = p.product_id
+                LEFT JOIN dim_category_translation ct ON p.product_category_name = ct.product_category_name
+                LEFT JOIN fact_reviews fr ON o.order_id = fr.order_id
+                
+                WHERE 
+                    -- Solo pedidos entregados con retraso
+                    o.order_delivered_customer_date IS NOT NULL
+                    AND o.order_estimated_delivery_date IS NOT NULL
+                    AND o.order_delivered_customer_date > o.order_estimated_delivery_date
+                    
+                    -- Umbral de días configurable
+                    AND DATEDIFF(o.order_delivered_customer_date, o.order_estimated_delivery_date) >= %s
+                    
+                    -- Coordenadas válidas
+                    AND g.latitude IS NOT NULL 
+                    AND g.longitude IS NOT NULL
+                
+                ORDER BY dias_retraso DESC, valor_pedido DESC
+                LIMIT %s
+            """
+            cursor.execute(sql, (dias_minimos, limite))
+            rows = cursor.fetchall()
+            
+            data = []
+            for row in rows:
+                data.append({
+                    "latitud": float(row['latitud']),
+                    "longitud": float(row['longitud']),
+                    "ciudad": row['ciudad'],
+                    "estado_cliente": row['estado_cliente'],
+                    "dias_retraso": row['dias_retraso'],
+                    "valor_pedido": float(row['valor_pedido']),
+                    "valor_flete": float(row['valor_flete']),
+                    "categoria_producto": row['categoria_producto'],
+                    "categoria_en": row['categoria_en'],
+                    "score_resena": row['score_resena'],
+                    "order_id": row['order_id']
+                })
+                
+        conn.close()
+        return {"status": "ok", "total_retrasos": len(data), "dias_minimos": dias_minimos, "data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+# ==========================================
+# ENDPOINT: FLETE VS DISTANCIA GEOESPACIAL
+# ==========================================
+@router.get("/flete-vs-distancia")
+def flete_vs_distancia(
+    token: str = Security(validar_token),
+    agrupar_por: str = Query("ruta", description="Opciones: 'ruta' (origen→destino), 'estado_destino', 'estado_origen'")
+):
+    """
+    Calcula distancia Haversine entre vendedor y cliente, cruzada con costo de flete.
+    Detecta rutas donde el flete es desproporcionado respecto a la distancia.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            
+            # Fórmula de Haversine en SQL puro (radio de Tierra = 6371 km)
+            haversine_sql = """
+                6371 * 2 * ASIN(SQRT(
+                    POWER(SIN(RADIANS(g_v.latitude - g_c.latitude) / 2), 2) +
+                    COS(RADIANS(g_v.latitude)) * COS(RADIANS(g_c.latitude)) *
+                    POWER(SIN(RADIANS(g_v.longitude - g_c.longitude) / 2), 2)
+                ))
+            """
+            
+            if agrupar_por == "ruta":
+                sql = f"""
+                    SELECT 
+                        g_v.state AS estado_origen,
+                        g_c.state AS estado_destino,
+                        g_v.city AS ciudad_origen,
+                        g_c.city AS ciudad_destino,
+                        
+                        -- Distancia calculada
+                        ROUND(AVG({haversine_sql}), 2) AS distancia_km,
+                        
+                        -- Métricas de flete
+                        COALESCE(ROUND(AVG(fs.freight_value), 2), 0) AS flete_promedio,
+                        COALESCE(ROUND(AVG(fs.price), 2), 0) AS precio_promedio,
+                        COALESCE(ROUND(AVG(fs.freight_value) / NULLIF(AVG(fs.price), 0) * 100, 2), 0) AS pct_flete_sobre_precio,
+                        
+                        -- Coordenadas para el mapa (promedio de la ruta)
+                        ROUND(AVG(g_v.latitude), 6) AS lat_origen,
+                        ROUND(AVG(g_v.longitude), 6) AS lon_origen,
+                        ROUND(AVG(g_c.latitude), 6) AS lat_destino,
+                        ROUND(AVG(g_c.longitude), 6) AS lon_destino,
+                        
+                        COUNT(*) AS total_envios,
+                        COALESCE(SUM(fs.freight_value), 0) AS flete_total_acumulado
+                        
+                    FROM fact_sales fs
+                    JOIN dim_orders o ON fs.order_id = o.order_id
+                    JOIN dim_customers c ON o.customer_id = c.customer_id
+                    JOIN dim_sellers s ON fs.seller_id = s.seller_id
+                    JOIN dim_geolocation g_v ON s.zip_code_prefix = g_v.zip_code_prefix
+                    JOIN dim_geolocation g_c ON c.zip_code_prefix = g_c.zip_code_prefix
+                    
+                    WHERE 
+                        g_v.latitude IS NOT NULL AND g_v.longitude IS NOT NULL
+                        AND g_c.latitude IS NOT NULL AND g_c.longitude IS NOT NULL
+                    
+                    GROUP BY g_v.state, g_c.state, g_v.city, g_c.city
+                    HAVING COUNT(*) >= 5
+                    ORDER BY pct_flete_sobre_precio DESC, distancia_km DESC
+                """
+                cursor.execute(sql)
+                
+            elif agrupar_por == "estado_destino":
+                sql = f"""
+                    SELECT 
+                        g_c.state AS estado_destino,
+                        ROUND(AVG({haversine_sql}), 2) AS distancia_km,
+                        COALESCE(ROUND(AVG(fs.freight_value), 2), 0) AS flete_promedio,
+                        COALESCE(ROUND(AVG(fs.price), 2), 0) AS precio_promedio,
+                        COALESCE(ROUND(AVG(fs.freight_value) / NULLIF(AVG(fs.price), 0) * 100, 2), 0) AS pct_flete_sobre_precio,
+                        COUNT(*) AS total_envios,
+                        ROUND(AVG(g_c.latitude), 6) AS latitud,
+                        ROUND(AVG(g_c.longitude), 6) AS longitud
+                        
+                    FROM fact_sales fs
+                    JOIN dim_orders o ON fs.order_id = o.order_id
+                    JOIN dim_customers c ON o.customer_id = c.customer_id
+                    JOIN dim_sellers s ON fs.seller_id = s.seller_id
+                    JOIN dim_geolocation g_v ON s.zip_code_prefix = g_v.zip_code_prefix
+                    JOIN dim_geolocation g_c ON c.zip_code_prefix = g_c.zip_code_prefix
+                    
+                    WHERE g_c.latitude IS NOT NULL AND g_c.longitude IS NOT NULL
+                    
+                    GROUP BY g_c.state
+                    ORDER BY pct_flete_sobre_precio DESC
+                """
+                cursor.execute(sql)
+                
+            else:  # estado_origen
+                sql = f"""
+                    SELECT 
+                        g_v.state AS estado_origen,
+                        ROUND(AVG({haversine_sql}), 2) AS distancia_km,
+                        COALESCE(ROUND(AVG(fs.freight_value), 2), 0) AS flete_promedio,
+                        COALESCE(ROUND(AVG(fs.price), 2), 0) AS precio_promedio,
+                        COALESCE(ROUND(AVG(fs.freight_value) / NULLIF(AVG(fs.price), 0) * 100, 2), 0) AS pct_flete_sobre_precio,
+                        COUNT(*) AS total_envios,
+                        ROUND(AVG(g_v.latitude), 6) AS latitud,
+                        ROUND(AVG(g_v.longitude), 6) AS longitud
+                        
+                    FROM fact_sales fs
+                    JOIN dim_orders o ON fs.order_id = o.order_id
+                    JOIN dim_customers c ON o.customer_id = c.customer_id
+                    JOIN dim_sellers s ON fs.seller_id = s.seller_id
+                    JOIN dim_geolocation g_v ON s.zip_code_prefix = g_v.zip_code_prefix
+                    JOIN dim_geolocation g_c ON c.zip_code_prefix = g_c.zip_code_prefix
+                    
+                    WHERE g_v.latitude IS NOT NULL AND g_v.longitude IS NOT NULL
+                    
+                    GROUP BY g_v.state
+                    ORDER BY pct_flete_sobre_precio DESC
+                """
+                cursor.execute(sql)
+            
+            rows = cursor.fetchall()
+            
+            # Formatear respuesta
+            data = []
+            for row in rows:
+                item = dict(row)
+                # Convertir Decimals a float para JSON serializable
+                for key in ['distancia_km', 'flete_promedio', 'precio_promedio', 
+                           'pct_flete_sobre_precio', 'latitud', 'longitud',
+                           'lat_origen', 'lon_origen', 'lat_destino', 'lon_destino',
+                           'flete_total_acumulado']:
+                    if key in item and item[key] is not None:
+                        item[key] = float(item[key])
+                data.append(item)
+                
+        conn.close()
+        return {
+            "status": "ok", 
+            "agrupado_por": agrupar_por,
+            "total_rutas": len(data),
+            "data": data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")

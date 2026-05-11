@@ -33,8 +33,8 @@ export default function AnnualGrowthChart() {
               type: "line",
               label: "Total Pedidos",
               data: data.map(d => d.total_pedidos),
-              borderColor: "rgba(59, 130, 246, 1)", // Blue 500
-              backgroundColor: "rgba(59, 130, 246, 0.5)",
+              borderColor: "rgb(177, 207, 255)", // Blue 500
+              backgroundColor: "rgba(151, 188, 248, 0.74)",
               borderWidth: 2,
               yAxisID: "y1", // Eje secundario
             },
@@ -82,7 +82,7 @@ export default function AnnualGrowthChart() {
                   display: true,
                   position: "right",
                   grid: { drawOnChartArea: false }, // Evitar que se crucen las líneas de la cuadrícula
-                  ticks: { color: "#3b82f6" }
+                  ticks: { color: "#b8d3ff" }
                 }
               },
               plugins: { legend: { labels: { color: '#a1a1aa' } } }

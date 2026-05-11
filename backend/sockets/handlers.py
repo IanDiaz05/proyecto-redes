@@ -29,14 +29,6 @@ def procesar_e_insertar(origen_red, datos_crudos):
 
             # --- DIMENSIONES ---
             
-            # Geolocalización del cliente
-            cursor.execute("INSERT IGNORE INTO dim_geolocation (zip_code_prefix, city, state) VALUES (%s, %s, %s)", 
-                           (d['customer_zip_code'], d['customer_city'], d['customer_state']))
-            
-            # Geolocalización del vendedor
-            cursor.execute("INSERT IGNORE INTO dim_geolocation (zip_code_prefix, city, state) VALUES (%s, %s, %s)", 
-                           (d['seller_zip_code'], d['seller_city'], d['seller_state']))
-            
             # Cliente
             cursor.execute("INSERT IGNORE INTO dim_customers (customer_id, zip_code_prefix, city, state) VALUES (%s, %s, %s, %s)", 
                            (d['customer_id'], d['customer_zip_code'], d['customer_city'], d['customer_state']))

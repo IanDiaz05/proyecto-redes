@@ -8,10 +8,12 @@ RUN npm install
 # Declarar los argumentos de construcción (ARG)
 ARG VITE_API_BASE_URL
 ARG VITE_API_KEY
+ARG VITE_MAPBOX_TOKEN
 
 # Pasarlos a variables de entorno (ENV) para que Vite los lea al compilar
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 ENV VITE_API_KEY=$VITE_API_KEY
+ENV VITE_MAPBOX_TOKEN=$VITE_MAPBOX_TOKEN
 
 # Copiar el resto y construir
 COPY . .
