@@ -16,8 +16,6 @@ export default function ProtocolBalanceChart() {
     const loadData = async () => {
       try {
         const data = await fetchApi("/balance-protocolos");
-        
-        // Formatear datos para Chart.js
         const labels = data.map((item) => item.origen);
         const values = data.map((item) => item.total);
 
@@ -27,14 +25,8 @@ export default function ProtocolBalanceChart() {
             {
               label: "Total de Registros",
               data: values,
-              backgroundColor: [
-                "rgba(16, 185, 129, 0.8)", // Emerald 500 (TCP)
-                "rgba(59, 130, 246, 0.8)", // Blue 500 (UDP)
-              ],
-              borderColor: [
-                "rgba(16, 185, 129, 1)",
-                "rgba(59, 130, 246, 1)",
-              ],
+              backgroundColor: ["rgba(53, 16, 185, 0.8)", "rgba(199, 246, 59, 0.8)"],
+              borderColor: ["rgba(53, 16, 185, 0.8)", "rgba(199, 246, 59, 0.8)"],
               borderWidth: 1,
             },
           ],
@@ -47,6 +39,8 @@ export default function ProtocolBalanceChart() {
     };
 
     loadData();
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
@@ -63,6 +57,7 @@ export default function ProtocolBalanceChart() {
             options={{ 
               responsive: true, 
               maintainAspectRatio: false,
+              animation: { duration: 0 },
               plugins: {
                 legend: { position: 'bottom', labels: { color: '#a1a1aa' } }
               }
