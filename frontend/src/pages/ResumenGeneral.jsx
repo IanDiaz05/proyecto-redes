@@ -3,7 +3,7 @@ import GlobalSatisfactionCard from "@/components/GlobalSatisfactionCard"
 import ProtocolBalanceChart from "@/components/ProtocolBalanceChart"
 import AnnualGrowthChart from "@/components/AnnualGrowthChart"
 import MonthlyTicketChart from "@/components/MonthlyTicketChart"
-import MapaClientes from "@/components/MapaClientes"
+import RutasLogisticasMap from "@/components/RutasLogisticasMap";
 
 export default function ResumenGeneral() {
   return (
@@ -27,7 +27,8 @@ export default function ResumenGeneral() {
       <div className="grid gap-4 md:grid-cols-3">
         <ProtocolBalanceChart />
         <div className="md:col-span-2">
-          <MapaClientes />
+          
+          <RutasLogisticasMap />
         </div>
       </div>
 

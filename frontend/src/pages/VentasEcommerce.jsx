@@ -10,7 +10,7 @@ import MetodosPagoChart from "@/components/MetodosPagoChart";
 import TopClientesTable from "@/components/TopClientesTable";
 import PedidosSinResenaCard from "@/components/PedidosSinResenaCard";
 import MapaSellers from "@/components/MapaSellers";
-import RutasLogisticasMap from "@/components/RutasLogisticasMap";
+import MapaClientes from "@/components/MapaClientes"
 
 export default function VentasEcommerce() {
   return (
@@ -57,7 +57,7 @@ export default function VentasEcommerce() {
           {/* Fila 2: Mapas Geográficos de Logística */}
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-6">
             <MapaSellers />
-            <RutasLogisticasMap />
+            <MapaClientes />
           </div>
         </TabsContent>
 
