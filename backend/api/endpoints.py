@@ -461,30 +461,28 @@ def mapa_clientes(token: str = Security(validar_token)):
 
 
 # ==========================================
-# 14. MÉTODOS DE PAGO POR ESTADO
+# 14. DISTRIBUCIÓN DE MÉTODOS DE PAGO
 # ==========================================
-@router.get("/pagos-por-estado")
-def pagos_por_estado(token: str = Security(validar_token)):
-    """Método de pago más usado en cada estado. Para gráfica de barras apiladas."""
+@router.get("/distribucion-pagos")
+def distribucion_pagos(token: str = Security(validar_token)):
+    """Distribución global de métodos de pago para gráfica de pastel."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             sql = """
-                SELECT
-                    c.state              AS estado,
-                    p.payment_type       AS metodo_pago,
-                    COUNT(*)             AS total_transacciones,
-                    SUM(p.payment_value) AS monto_total
-                FROM fact_payments p
-                JOIN dim_orders o    ON p.order_id    = o.order_id
-                JOIN dim_customers c ON o.customer_id = c.customer_id
-                GROUP BY c.state, p.payment_type
-                ORDER BY c.state, total_transacciones DESC
+                SELECT 
+                    payment_type AS metodo,
+                    COUNT(*) AS total_transacciones,
+                    COALESCE(SUM(payment_value), 0) AS monto_total,
+                    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 2) AS porcentaje
+                FROM fact_payments
+                GROUP BY payment_type
+                ORDER BY total_transacciones DESC
             """
             cursor.execute(sql)
-            resultados = cursor.fetchall()
+            resultado = cursor.fetchall()
         conn.close()
-        return {"status": "ok", "data": resultados}
+        return {"status": "ok", "data": resultado}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
 
