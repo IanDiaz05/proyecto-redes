@@ -701,40 +701,37 @@ def obtener_balance_protocolos(token: str = Security(validar_token)):
         raise HTTPException(status_code=500, detail=f"Error en auditoría: {str(e)}")
     
 # ==========================================
-# 2. VENTAS RECIENTES (Feed en vivo)
+# 22. VENTAS RECIENTES (Feed en vivo - Random, sin DEMO-)
+# Esta tabla es una simulación de un feed en vivo, mostrando las ventas más recientes excluyendo las de prueba (DEMO-).
+# asegurando que cada vez que se consulte, se obtenga un conjunto aleatorio de ventas reales ordenadas por fecha de compra más reciente.
 # ==========================================
 @router.get("/ventas-recientes")
 def ventas_recientes(
     token: str = Security(validar_token),
-    limite: int = Query(10, ge=1, le=50)
+    limite: int = Query(6, ge=1, le=50)
 ):
-    """Últimas ventas procesadas con detalle de producto, vendedor y ubicación."""
+    """Feed aleatorio de ventas reales (excluye DEMO-), ordenadas por más recientes."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             sql = """
-                SELECT 
-                    fs.order_id,
-                    fs.total_value,
-                    fs.price,
-                    fs.freight_value,
-                    p.product_category_name AS categoria,
-                    ct.product_category_name_english AS categoria_en,
-                    s.seller_id,
-                    s.city AS ciudad_vendedor,
-                    s.state AS estado_vendedor,
-                    c.customer_id,
-                    c.city AS ciudad_cliente,
-                    c.state AS estado_cliente,
-                    d.purchase_date_id AS fecha_compra
-                FROM fact_sales fs
-                JOIN dim_products p ON fs.product_id = p.product_id
-                LEFT JOIN dim_category_translation ct ON p.product_category_name = ct.product_category_name
-                JOIN dim_sellers s ON fs.seller_id = s.seller_id
-                JOIN dim_orders d ON fs.order_id = d.order_id
-                JOIN dim_customers c ON d.customer_id = c.customer_id
-                ORDER BY d.purchase_date_id DESC, fs.order_id DESC
-                LIMIT %s
+                SELECT order_id, categoria, estado_cliente, total_value
+                FROM (
+                    SELECT 
+                        fs.order_id,
+                        p.product_category_name AS categoria,
+                        c.state AS estado_cliente,
+                        fs.total_value,
+                        o.purchase_date_id
+                    FROM fact_sales fs
+                    JOIN dim_products p ON fs.product_id = p.product_id
+                    JOIN dim_orders o ON fs.order_id = o.order_id
+                    JOIN dim_customers c ON o.customer_id = c.customer_id
+                    WHERE fs.order_id NOT LIKE 'DEMO-%%'
+                    ORDER BY RAND()
+                    LIMIT %s
+                ) AS ventas_random
+                ORDER BY purchase_date_id DESC
             """
             cursor.execute(sql, (limite,))
             resultado = cursor.fetchall()
@@ -743,48 +740,6 @@ def ventas_recientes(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
-# ==========================================
-# 3. COMPARATIVA HOY VS AYER
-# ==========================================
-@router.get("/comparativa-diaria")
-def comparativa_diaria(token: str = Security(validar_token)):
-    """Comparativa de ventas de hoy vs el día anterior."""
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT 
-                    DATE(purchase_date_id) AS fecha,
-                    COUNT(DISTINCT fs.order_id) AS total_pedidos,
-                    COALESCE(SUM(fs.total_value), 0) AS ingresos_totales,
-                    COALESCE(ROUND(AVG(fs.total_value), 2), 0) AS ticket_promedio,
-                    COUNT(DISTINCT fs.order_id) AS transacciones
-                FROM dim_orders o
-                JOIN fact_sales fs ON o.order_id = fs.order_id
-                WHERE purchase_date_id >= DATE_SUB(CURDATE(), INTERVAL 1 DAY)
-                GROUP BY DATE(purchase_date_id)
-                ORDER BY fecha DESC
-                LIMIT 2
-            """
-            cursor.execute(sql)
-            rows = cursor.fetchall()
-            
-            # Normalizar respuesta
-            hoy = rows[0] if len(rows) > 0 else None
-            ayer = rows[1] if len(rows) > 1 else None
-            
-        conn.close()
-        return {
-            "status": "ok",
-            "data": {
-                "hoy": hoy,
-                "ayer": ayer,
-                "diferencia_pedidos": round(((hoy['total_pedidos'] - ayer['total_pedidos']) / ayer['total_pedidos'] * 100), 2) if hoy and ayer and ayer['total_pedidos'] else 0,
-                "diferencia_ingresos": round(((hoy['ingresos_totales'] - ayer['ingresos_totales']) / ayer['ingresos_totales'] * 100), 2) if hoy and ayer and ayer['ingresos_totales'] else 0
-            }
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     
 # ==========================================
 # ENDPOINT: RUTAS LOGÍSTICAS (ArcLayer Deck.gl)
@@ -869,90 +824,6 @@ def rutas_logisticas(
                 
         conn.close()
         return {"status": "ok", "total_rutas": len(data), "data": data}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
-    
-# ==========================================
-# ENDPOINT: RETRASOS GEOESPACIALES
-# ==========================================
-@router.get("/retrasos-geo")
-def retrasos_geo(
-    token: str = Security(validar_token),
-    dias_minimos: int = Query(7, ge=1, le=60, description="Días mínimos de retraso para filtrar"),
-    limite: int = Query(1000, ge=10, le=5000)
-):
-    """
-    Pedidos con entrega tardía, geolocalizados en el cliente.
-    Incluye score de reseña para correlacionar demora con insatisfacción.
-    """
-    try:
-        conn = get_db_connection()
-        with conn.cursor() as cursor:
-            sql = """
-                SELECT 
-                    g.latitude AS latitud,
-                    g.longitude AS longitud,
-                    g.city AS ciudad,
-                    g.state AS estado_cliente,
-                    
-                    -- Cálculo de días de retraso
-                    DATEDIFF(o.order_delivered_customer_date, o.order_estimated_delivery_date) AS dias_retraso,
-                    
-                    -- Métricas del pedido afectado
-                    fs.total_value AS valor_pedido,
-                    fs.freight_value AS valor_flete,
-                    p.product_category_name AS categoria_producto,
-                    ct.product_category_name_english AS categoria_en,
-                    
-                    -- Correlación con satisfacción
-                    fr.review_score AS score_resena,
-                    o.order_id
-                    
-                FROM dim_orders o
-                JOIN fact_sales fs ON o.order_id = fs.order_id
-                JOIN dim_customers c ON o.customer_id = c.customer_id
-                JOIN dim_geolocation g ON c.zip_code_prefix = g.zip_code_prefix
-                JOIN dim_products p ON fs.product_id = p.product_id
-                LEFT JOIN dim_category_translation ct ON p.product_category_name = ct.product_category_name
-                LEFT JOIN fact_reviews fr ON o.order_id = fr.order_id
-                
-                WHERE 
-                    -- Solo pedidos entregados con retraso
-                    o.order_delivered_customer_date IS NOT NULL
-                    AND o.order_estimated_delivery_date IS NOT NULL
-                    AND o.order_delivered_customer_date > o.order_estimated_delivery_date
-                    
-                    -- Umbral de días configurable
-                    AND DATEDIFF(o.order_delivered_customer_date, o.order_estimated_delivery_date) >= %s
-                    
-                    -- Coordenadas válidas
-                    AND g.latitude IS NOT NULL 
-                    AND g.longitude IS NOT NULL
-                
-                ORDER BY dias_retraso DESC, valor_pedido DESC
-                LIMIT %s
-            """
-            cursor.execute(sql, (dias_minimos, limite))
-            rows = cursor.fetchall()
-            
-            data = []
-            for row in rows:
-                data.append({
-                    "latitud": float(row['latitud']),
-                    "longitud": float(row['longitud']),
-                    "ciudad": row['ciudad'],
-                    "estado_cliente": row['estado_cliente'],
-                    "dias_retraso": row['dias_retraso'],
-                    "valor_pedido": float(row['valor_pedido']),
-                    "valor_flete": float(row['valor_flete']),
-                    "categoria_producto": row['categoria_producto'],
-                    "categoria_en": row['categoria_en'],
-                    "score_resena": row['score_resena'],
-                    "order_id": row['order_id']
-                })
-                
-        conn.close()
-        return {"status": "ok", "total_retrasos": len(data), "dias_minimos": dias_minimos, "data": data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
     

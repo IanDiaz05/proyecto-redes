@@ -24,6 +24,10 @@ export default function ApiDocs() {
     { method: "GET", path: "/comparativa-anual", desc: "Crecimiento de ingresos y pedidos año contra año." },
     { method: "GET", path: "/telemetria-vivo", desc: "Últimos 20 registros del puerto UDP en tiempo real." },
     { method: "GET", path: "/balance-protocolos", desc: "Carga de la red (TCP vs UDP)." },
+    { method: "GET", path: "/flete-vs-distancia", desc: "Detecta rutas donde el flete es desproporcionado respecto a la distancia." },
+    { method: "GET", path: "rutas-logisticas", desc: "Devuelve arcos origen→destino con metadatos" },
+    { method: "GET", path: "/ventas-recientes", desc: "Últimas 6 ventas con detalles para la tabla de resumen." },
+
   ];
 
   return (
@@ -87,7 +91,7 @@ export default function ApiDocs() {
 
         {/* Columna Derecha: Lista de Endpoints */}
         <div className="md:col-span-2 min-w-0">
-          <Card className="bg-card flex flex-col h-[58vh]">
+          <Card className="bg-card flex flex-col h-[61vh]">
             <CardHeader className="shrink-0">
               <CardTitle className="text-md flex items-center gap-2">
                 <Terminal className="w-4 h-4 text-purple-500" />

@@ -10,7 +10,8 @@ import MetodosPagoChart from "@/components/MetodosPagoChart";
 import TopClientesTable from "@/components/TopClientesTable";
 import PedidosSinResenaCard from "@/components/PedidosSinResenaCard";
 import MapaSellers from "@/components/MapaSellers";
-import MapaClientes from "@/components/MapaClientes"
+import MapaClientes from "@/components/MapaClientes";
+import FleteDisparidadMap from "@/components/FleteDisparidadMap";
 
 export default function VentasEcommerce() {
   return (
@@ -20,21 +21,43 @@ export default function VentasEcommerce() {
         <p className="text-muted-foreground">Análisis de catálogo, comportamiento de compra y logística.</p>
       </div>
       
-      <Tabs defaultValue="catalogo" className="w-full">
+      <Tabs defaultValue="logistica" className="w-full">
         {/* Navegación de las pestañas */}
         <TabsList className="flex h-auto w-full overflow-x-auto justify-start p-1 md:grid md:grid-cols-3 mb-8 bg-zinc-200 dark:bg-zinc-800/50">
-          <TabsTrigger value="catalogo" className="whitespace-nowrap px-4">
-            Catálogo y Calidad
-          </TabsTrigger>
           <TabsTrigger value="logistica" className="whitespace-nowrap px-4">
             Logística y Geografía
+          </TabsTrigger>
+          <TabsTrigger value="catalogo" className="whitespace-nowrap px-4">
+            Catálogo y Calidad
           </TabsTrigger>
           <TabsTrigger value="comportamiento" className="whitespace-nowrap px-4">
             Comportamiento del Cliente
           </TabsTrigger>
         </TabsList>
 
-        {/* Pestaña 1: Catálogo */}
+        {/* Pestaña 1: Logística */}
+        <TabsContent value="logistica" className="space-y-4">
+          
+          {/* Fila 1: Mapas Geográficos Operativos (Vendedores y Rutas Normales) */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-6">
+            <MapaSellers />
+            <MapaClientes />
+          </div>
+
+          {/* Fila 2: MAPA CRÍTICO (Full Width) */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-6">
+            <FleteDisparidadMap />
+          </div>
+
+          {/* Fila 3: Gráficas de Logística */}
+          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+            <VentasPorEstadoChart />
+            <RelacionPrecioFleteChart />
+          </div>
+
+        </TabsContent>
+
+        {/* Pestaña 2: Catálogo */}
         <TabsContent value="catalogo" className="space-y-4">
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-3">
             <div className="lg:col-span-2"><TopCategoriesTable /></div>
@@ -43,21 +66,6 @@ export default function VentasEcommerce() {
           <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
             <PriceRangeChart />
             <SalesByDayChart />
-          </div>
-        </TabsContent>
-
-        {/* Pestaña 2: Logística */}
-        <TabsContent value="logistica" className="space-y-4">
-          {/* Fila 1: Gráficas de Logística */}
-          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-            <VentasPorEstadoChart />
-            <RelacionPrecioFleteChart />
-          </div>
-          
-          {/* Fila 2: Mapas Geográficos de Logística */}
-          <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 mt-6">
-            <MapaSellers />
-            <MapaClientes />
           </div>
         </TabsContent>
 
