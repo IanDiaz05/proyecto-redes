@@ -20,8 +20,7 @@ export default function KpiCards() {
         setLoading(false)
       }
     }
-    const interval = setInterval(loadKpis, 6000);
-    return () => clearInterval(interval);
+
     loadKpis()
   }, [])
 

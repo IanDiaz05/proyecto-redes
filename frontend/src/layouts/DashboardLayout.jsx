@@ -2,6 +2,8 @@ import { Activity, Database, LayoutDashboard, Server, BookOpen, Menu, X } from "
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import OrderSearch from "@/components/OrderSearch";
+import SystemStatus from "@/components/SystemStatus";
+import LatencyMonitor from "@/components/LatencyMonitor";
 
 export default function DashboardLayout({ children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -48,6 +50,7 @@ export default function DashboardLayout({ children }) {
           
           {/* Sección de Desarrolladores */}
           <div className="mt-auto pt-4 border-t border-zinc-200 dark:border-zinc-800 space-y-1">
+            <SystemStatus />
             <NavItem to="/docs" icon={<BookOpen />} label="API Docs" />
             
             <a 
@@ -98,15 +101,7 @@ export default function DashboardLayout({ children }) {
             
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center space-x-3 bg-zinc-100 dark:bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-200 dark:border-zinc-800">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-xs text-zinc-700 dark:text-zinc-300 font-medium">
-              API Conectada
-            </span>
-          </div>
+          <LatencyMonitor />
         </header>
 
         {/* Área de Contenido Dinámico */}

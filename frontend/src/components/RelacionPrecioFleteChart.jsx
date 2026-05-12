@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Chart as ChartJS, LinearScale, PointElement, Tooltip, Legend } from "chart.js";
 import { Scatter } from "react-chartjs-2";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { fetchApi } from "@/services/apicalls";
 
 ChartJS.register(LinearScale, PointElement, Tooltip, Legend);
@@ -41,6 +41,9 @@ export default function RelacionPrecioFleteChart() {
     <Card className="bg-card">
       <CardHeader>
         <CardTitle className="text-sm font-medium">Relación Precio Promedio vs Flete</CardTitle>
+        <CardDescription className="text-xs">
+          Cada punto es una categoría de producto: a la derecha, productos caros; arriba, envíos costosos.
+        </CardDescription>
       </CardHeader>
       <CardContent className="h-[350px]">
         {chartData ? (

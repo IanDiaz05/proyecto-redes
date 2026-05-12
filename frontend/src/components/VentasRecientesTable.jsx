@@ -18,7 +18,7 @@ export default function VentasRecientesTable() {
         const arrayDatos = res.data ? res.data : res;
         
         if (Array.isArray(arrayDatos)) {
-          setData(arrayDatos.slice(0, 6)); 
+          setData(arrayDatos.slice(0, 9)); 
         }
       } catch (error) {
         console.error("Error al cargar ventas recientes:", error);
@@ -94,7 +94,7 @@ export default function VentasRecientesTable() {
                     {venta.categoria.replace(/_/g, ' ')}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-emerald-900 text-emerald-400">
+                    <Badge variant="outline" className="text-[9px] px-1 py-0 border-cyan-500/20 text-cyan-600">
                       {venta.estado_cliente}
                     </Badge>
                   </TableCell>

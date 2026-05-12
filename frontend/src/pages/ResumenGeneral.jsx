@@ -26,7 +26,7 @@ export default function ResumenGeneral() {
       
       {/* Fila 2: Mapa de calor y Protocolos */}
       <div className="grid gap-4 md:grid-cols-3">
-        <ProtocolBalanceChart />
+        <VentasRecientesTable />
         <div className="md:col-span-2">
           <RutasLogisticasMap />
         </div>
@@ -37,7 +37,7 @@ export default function ResumenGeneral() {
         <AnnualGrowthChart />
         {/* mini tabla con 6 ordenes recientes */}
         <div className="md:col-span-1">
-          <VentasRecientesTable />
+          <ProtocolBalanceChart />
         </div>
       </div>
 

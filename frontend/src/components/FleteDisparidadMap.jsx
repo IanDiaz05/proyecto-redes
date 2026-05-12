@@ -13,7 +13,7 @@ const INITIAL_VIEW_STATE = {
   longitude: -48.232976,
   latitude: -14.235,
   zoom: 3.5,
-  pitch: 50, // Bien inclinado para destacar los arcos rojos de alerta
+  pitch: 50,
   bearing: 0
 };
 
@@ -70,7 +70,9 @@ export default function FleteDisparidadMap() {
           Análisis Crítico: Disparidad de Flete vs Precio del Producto
         </CardTitle>
         <CardDescription className="text-xs">
-          Arcos <span className="text-red-500 font-bold">rojos altos</span> indican rutas donde el envío cuesta más que el producto mismo (menor a 100%).
+          Arcos <span className="text-red-500 font-bold">rojos altos</span> indican rutas donde el envío cuesta más que el producto mismo (gasto mayor a 100%).
+          <br />
+          Arcos <span className="text-yellow-400 font-bold">amarillos</span> muestran rutas con disparidad entre 50% y 100% (riesgo medio).
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0 flex-1 relative">

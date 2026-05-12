@@ -3,7 +3,7 @@ import DeckGL from '@deck.gl/react';
 import { ArcLayer } from '@deck.gl/layers';
 import Map from 'react-map-gl/mapbox';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchApi } from "@/services/apicalls";
 
@@ -54,6 +54,11 @@ export default function RutasLogisticasMap() {
     <Card className="bg-card col-span-1 h-[450px] overflow-hidden flex flex-col border-emerald-900/30">
       <CardHeader className="pb-2 shrink-0">
         <CardTitle className="text-sm font-medium">Corredores Logísticos (Origen - Destino)</CardTitle>
+        <CardDescription className="text-xs">
+          Visualización de rutas logísticas entre ciudades de origen y destino.
+          <br />
+          el color <span className="text-emerald-500 font-bold">verde</span> representa a los vendedores y el <span className="text-blue-500 font-bold">azul</span> a los clientes. El grosor de las líneas indica la cantidad de paquetes transportados.
+        </CardDescription>
       </CardHeader>
       <CardContent className="p-0 flex-1 relative">
         {loading ? (

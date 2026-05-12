@@ -35,7 +35,7 @@ export const fetchApi = async (endpoint, options = {}) => {
       throw new Error(result.message || `Error del servidor: ${response.status}`);
     }
 
-    // Retornamos directamente la data para que los componentes la consuman fácil
+    // Retornamos directamente la data para consumir en los componentes
     return result.data;
     
   } catch (error) {
