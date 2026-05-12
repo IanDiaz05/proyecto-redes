@@ -1,11 +1,12 @@
 import os
+import datetime
 from fastapi import APIRouter, HTTPException, Security, status, Query
 from fastapi.security import APIKeyHeader
 from core.database import get_db_connection
 from dotenv import load_dotenv
 
 load_dotenv()
-
+api_version = "v2.4.1"
 router = APIRouter()
 
 # ==========================================
@@ -22,7 +23,136 @@ def validar_token(api_key: str = Security(header_scheme)):
         )
     return api_key
 
-
+# ==========================================
+# ENDPOINT: ESTADO DEL SISTEMA (Health Check)
+# ==========================================
+@router.get("/sistema-estado")
+def sistema_estado(
+    token: str = Security(validar_token),
+    incluir_historico: bool = Query(False, description="Incluir conteos de últimos 5 minutos para sparklines"),
+    detalle_tablas: bool = Query(False, description="Desglosar conteo por tabla principal")
+):
+    """
+    Métricas de salud del Data Warehouse y pipeline de ingesta.
+    Ideal para sidebar de estado y monitoreo operativo.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            
+            # --- 1. Conteo total de registros en el DW ---
+            cursor.execute("SELECT COUNT(*) AS total FROM fact_sales")
+            total_ventas = cursor.fetchone()['total']
+            
+            cursor.execute("SELECT COUNT(*) AS total FROM dim_orders")
+            total_ordenes = cursor.fetchone()['total']
+            
+            # --- 2. Estado de ingesta UDP (últimos 10 segundos) ---
+            cursor.execute("""
+                SELECT COUNT(*) AS total 
+                FROM telemetry_logs 
+                WHERE timestamp >= DATE_SUB(NOW(), INTERVAL 10 SECOND)
+            """)
+            udp_ultimo_minuto = cursor.fetchone()['total']
+            
+            # --- 3. Estado de ingesta TCP (últimos 10 segundos) ---
+            cursor.execute("""
+                SELECT COUNT(*) AS total 
+                FROM central_logs 
+                WHERE origen = 'TCP' AND fecha >= DATE_SUB(NOW(), INTERVAL 10 SECOND)
+            """)
+            tcp_ultimo_minuto = cursor.fetchone()['total']
+            
+            # --- 4. Última sincronización (último registro en central_logs) ---
+            cursor.execute("""
+                SELECT MAX(fecha) AS ultima_sinc 
+                FROM central_logs
+            """)
+            ultima_sync = cursor.fetchone()['ultima_sinc']
+            
+            # --- 5. Tamaño total del DW (aproximado en registros) ---
+            cursor.execute("""
+                SELECT 
+                    (SELECT COUNT(*) FROM fact_sales) +
+                    (SELECT COUNT(*) FROM dim_orders) +
+                    (SELECT COUNT(*) FROM dim_customers) +
+                    (SELECT COUNT(*) FROM dim_sellers) +
+                    (SELECT COUNT(*) FROM telemetry_logs) +
+                    (SELECT COUNT(*) FROM central_logs) AS total_registros_dw
+            """)
+            total_registros_dw = cursor.fetchone()['total_registros_dw']
+            
+            # --- 6. Datos históricos para sparklines (si se solicitan) ---
+            historico = None
+            if incluir_historico:
+                cursor.execute("""
+                    SELECT 
+                        DATE_FORMAT(fecha, '%H:%i') AS minuto,
+                        SUM(CASE WHEN origen = 'TCP' THEN 1 ELSE 0 END) AS tcp,
+                        SUM(CASE WHEN origen = 'UDP' THEN 1 ELSE 0 END) AS udp
+                    FROM central_logs
+                    WHERE fecha >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                    GROUP BY DATE_FORMAT(fecha, '%H:%i')
+                    ORDER BY minuto ASC
+                """)
+                historico = cursor.fetchall()
+            
+            # --- 7. Detalle por tablas (si se solicita) ---
+            tablas = None
+            if detalle_tablas:
+                cursor.execute("""
+                    SELECT 
+                        'fact_sales' AS tabla, COUNT(*) AS registros FROM fact_sales
+                    UNION ALL
+                    SELECT 'dim_orders', COUNT(*) FROM dim_orders
+                    UNION ALL
+                    SELECT 'dim_customers', COUNT(*) FROM dim_customers
+                    UNION ALL
+                    SELECT 'dim_sellers', COUNT(*) FROM dim_sellers
+                    UNION ALL
+                    SELECT 'telemetry_logs', COUNT(*) FROM telemetry_logs
+                    UNION ALL
+                    SELECT 'central_logs', COUNT(*) FROM central_logs
+                """)
+                tablas = cursor.fetchall()
+            
+        conn.close()
+        
+        # Determinar estado de ingesta basado en actividad reciente
+        estado_udp = "Activa" if udp_ultimo_minuto > 0 else "Inactiva"
+        estado_tcp = "Activa" if tcp_ultimo_minuto > 0 else "Inactiva"
+        
+        # Formatear última sincronización
+        ultima_sync_str = ultima_sync.strftime('%Y-%m-%d %H:%M:%S') if ultima_sync else "Sin registros"
+        
+        respuesta = {
+            "status": "ok",
+            "data": {
+                "total_registros_dw": total_registros_dw,
+                "total_ventas_procesadas": total_ventas,
+                "total_ordenes_unicas": total_ordenes,
+                "estado_ingesta_udp": estado_udp,
+                "estado_ingesta_tcp": estado_tcp,
+                "registros_udp_ultimo_minuto": udp_ultimo_minuto,
+                "registros_tcp_ultimo_minuto": tcp_ultimo_minuto,
+                "ultima_sincronizacion": ultima_sync_str,
+                "version_api": api_version,
+                "timestamp_servidor": datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            }
+        }
+        
+        if historico:
+            respuesta["data"]["historico_ingesta_5min"] = historico
+            
+        if tablas:
+            respuesta["data"]["detalle_tablas"] = tablas
+            
+        return respuesta
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error en BD: {str(e)}")
+    
+    
 # ==========================================
 # 1. KPIs RESUMEN GENERAL
 # ==========================================
@@ -256,10 +386,13 @@ def detalle_pedido(order_id: str, token: str = Security(validar_token)):
 # ==========================================
 @router.get("/relacion-precio-flete")
 def relacion_precio_flete(
-    limit: int = Query(10, description="Top N categorías"),
+    min_ventas: int = Query(10, ge=1, description="Mínimo de ventas para incluir categoría"),
     token: str = Security(validar_token)
 ):
-    """Precio promedio vs flete promedio. Útil para gráfica de dispersión."""
+    """
+    Precio promedio vs flete promedio por categoría.
+    Incluye volumen de ventas para ponderar la relevancia de cada punto.
+    """
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
@@ -271,16 +404,17 @@ def relacion_precio_flete(
                     ROUND(AVG(s.freight_value), 2) AS flete_promedio,
                     ROUND(
                         AVG(s.freight_value) * 100.0 / NULLIF(AVG(s.price), 0)
-                    , 2)                           AS pct_flete_sobre_precio
+                    , 2)                           AS pct_flete_sobre_precio,
+                    COUNT(*)                       AS total_ventas
                 FROM fact_sales s
                 JOIN dim_products p ON s.product_id = p.product_id
                 LEFT JOIN dim_category_translation ct
                     ON p.product_category_name = ct.product_category_name
-                GROUP BY categoria
-                ORDER BY pct_flete_sobre_precio DESC
-                LIMIT %s
+                GROUP BY p.product_category_name, ct.product_category_name_english
+                HAVING COUNT(*) >= %s
+                ORDER BY total_ventas DESC
             """
-            cursor.execute(sql, (limit,))
+            cursor.execute(sql, (min_ventas,))
             resultados = cursor.fetchall()
         conn.close()
         return {"status": "ok", "data": resultados}
@@ -492,23 +626,19 @@ def distribucion_pagos(token: str = Security(validar_token)):
 # ==========================================
 @router.get("/ticket-promedio-mensual")
 def ticket_promedio_mensual(token: str = Security(validar_token)):
-    """Ticket promedio mes a mes. Útil para gráfica de tendencia."""
+    """Ticket promedio mensual. Tendencia de valor por orden."""
     try:
         conn = get_db_connection()
         with conn.cursor() as cursor:
             sql = """
                 SELECT
-                    d.year                              AS año,
-                    d.month                             AS mes,
-                    ROUND(AVG(sub.total_orden), 2)      AS ticket_promedio,
-                    COUNT(sub.order_id)                 AS total_pedidos
-                FROM (
-                    SELECT order_id, SUM(total_value) AS total_orden
-                    FROM fact_sales
-                    GROUP BY order_id
-                ) sub
-                JOIN dim_orders o ON sub.order_id = o.order_id
-                JOIN dim_date d   ON o.purchase_date_id = d.date_id
+                    d.year AS año,
+                    d.month AS mes,
+                    ROUND(AVG(fs.total_value), 2) AS ticket_promedio,
+                    COUNT(DISTINCT fs.order_id) AS total_pedidos
+                FROM fact_sales fs
+                JOIN dim_orders o ON fs.order_id = o.order_id
+                JOIN dim_date d ON o.purchase_date_id = d.date_id
                 GROUP BY d.year, d.month
                 ORDER BY d.year, d.month
             """
@@ -708,7 +838,7 @@ def obtener_balance_protocolos(token: str = Security(validar_token)):
 @router.get("/ventas-recientes")
 def ventas_recientes(
     token: str = Security(validar_token),
-    limite: int = Query(6, ge=1, le=50)
+    limite: int = Query(10, ge=1, le=50)
 ):
     """Feed aleatorio de ventas reales (excluye DEMO-), ordenadas por más recientes."""
     try:
@@ -719,12 +849,14 @@ def ventas_recientes(
                 FROM (
                     SELECT 
                         fs.order_id,
-                        p.product_category_name AS categoria,
+                        COALESCE(ct.product_category_name_english, p.product_category_name) AS categoria,
                         c.state AS estado_cliente,
                         fs.total_value,
                         o.purchase_date_id
                     FROM fact_sales fs
                     JOIN dim_products p ON fs.product_id = p.product_id
+                    LEFT JOIN dim_category_translation ct 
+                        ON p.product_category_name = ct.product_category_name
                     JOIN dim_orders o ON fs.order_id = o.order_id
                     JOIN dim_customers c ON o.customer_id = c.customer_id
                     WHERE fs.order_id NOT LIKE 'DEMO-%%'
