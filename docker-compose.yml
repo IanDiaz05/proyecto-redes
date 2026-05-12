@@ -1,7 +1,6 @@
 services:
   api-service:
     build: ./backend
-    # es necesario exponer los puertos ya que el objetivo de la actividad es monitorear el trafico de red TCP y UDP crudos.
     ports:
       - "12000:12000/tcp" 
       - "12001:12001/udp"

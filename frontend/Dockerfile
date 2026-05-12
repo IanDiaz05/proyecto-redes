@@ -23,5 +23,8 @@ FROM nginx:alpine
 # Copiamos la build de Vite
 COPY --from=build /app/dist /usr/share/nginx/html
 
+# Configuramos nginx para servir la SPA correctamente
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
 EXPOSE 80
 CMD ["nginx", "-g", "daemon off;"]
